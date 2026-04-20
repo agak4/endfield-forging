@@ -99,7 +99,42 @@ function init() {
         gridContainer.appendChild(row);
     });
 
+    sidebar.addEventListener('scroll', updateScrollIndicators);
+    
     selectItem(0);
+}
+
+/**
+ * 스크롤 영역 밖에 'exceed' 아이템이 있는지 감지하여 인디케이터 표시
+ */
+function updateScrollIndicators() {
+    const sidebar = document.getElementById('sidebar');
+    const topIndicator = document.getElementById('indicatorTop');
+    const bottomIndicator = document.getElementById('indicatorBottom');
+
+    if (!sidebar || !topIndicator || !bottomIndicator) return;
+
+    const exceedRows = document.querySelectorAll('.item-row.exceed');
+    let hasTop = false;
+    let hasBottom = false;
+
+    const sidebarRect = sidebar.getBoundingClientRect();
+
+    exceedRows.forEach(row => {
+        const rowRect = row.getBoundingClientRect();
+        // 사이드바의 실제 뷰포트 영역(상단/하단)과 비교
+        if (rowRect.bottom < sidebarRect.top) {
+            hasTop = true;
+        } else if (rowRect.top > sidebarRect.bottom) {
+            hasBottom = true;
+        }
+    });
+
+    if (hasTop) topIndicator.classList.add('active');
+    else topIndicator.classList.remove('active');
+
+    if (hasBottom) bottomIndicator.classList.add('active');
+    else bottomIndicator.classList.remove('active');
 }
 
 // 2. 아이템 선택
@@ -235,6 +270,9 @@ function applyFilter(conditionFn, msg) {
     document.getElementById('filterInfoArea').style.display = 'block';
     document.getElementById('filterMsg').textContent = `필터: ${msg} (분류: ${currentItem.category})`;
     document.getElementById('resetBtn').style.display = 'block';
+
+    // 필터 적용 후 인디케이터 초기 업데이트
+    setTimeout(updateScrollIndicators, 100); 
 }
 
 function resetFilter() {
@@ -246,6 +284,9 @@ function resetFilter() {
 
     document.querySelectorAll('.stat-row').forEach(row => row.classList.remove('active-filter'));
     activeFilterContext = null;
+
+    // 필터 초기화 시 인디케이터 숨김
+    updateScrollIndicators();
 }
 
 window.onload = loadEquipmentData;
