@@ -308,11 +308,53 @@
                 box-sizing: border-box;
                 border-left: none;
                 border-bottom: 1px solid var(--border);
-                padding: 20px;
+                padding: 15px 20px;
                 height: auto;
                 position: sticky;
                 top: 0;
                 z-index: 100;
+            }
+
+            .stat-box {
+                flex-direction: row;
+                flex-wrap: nowrap;
+                gap: 8px;
+            }
+
+            /* 가로 배치 시 stat-row 내부를 수직(label 위, value 아래) 구조로 재편 */
+            .stat-row {
+                flex: 1;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+                padding: 10px 12px;
+            }
+
+            .stat-label {
+                font-size: 0.75rem;
+                color: var(--text-sub);
+            }
+
+            .stat-value {
+                font-size: 0.95rem;
+            }
+
+            .scroll-indicator {
+                position: fixed;
+                left: 0;
+                right: 0;
+                z-index: 200;
+            }
+
+            .scroll-indicator.top {
+                top: 0;
+                height: 100px;
+                background: linear-gradient(to bottom, rgba(0, 255, 127, 0.4) 0%, transparent 100%);
+            }
+
+            .scroll-indicator.bottom {
+                bottom: 0;
+                background: linear-gradient(to top, rgba(0, 255, 127, 0.4) 0%, transparent 100%);
             }
 
             .sidebar-outer {
@@ -327,7 +369,8 @@
                 height: auto;
                 max-height: none;
                 overflow: visible;
-                padding-bottom: 40px; /* 하단 여백 추가 */
+                padding-bottom: 40px;
+                /* 하단 여백 추가 */
             }
 
             .item-grid {

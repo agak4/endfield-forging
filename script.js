@@ -100,7 +100,8 @@ function init() {
     });
 
     sidebar.addEventListener('scroll', updateScrollIndicators);
-    
+    window.addEventListener('scroll', updateScrollIndicators); // 모바일 전체 스크롤 대응
+
     selectItem(0);
 }
 
@@ -118,15 +119,31 @@ function updateScrollIndicators() {
     let hasTop = false;
     let hasBottom = false;
 
+    const isMobile = window.innerWidth <= 768;
     const sidebarRect = sidebar.getBoundingClientRect();
+
+    // 모바일에서 상단 고정 패널(info-panel) 높이 감안
+    const infoPanel = document.querySelector('.info-panel');
+    const stickyHeight = (isMobile && infoPanel) ? infoPanel.offsetHeight : 0;
 
     exceedRows.forEach(row => {
         const rowRect = row.getBoundingClientRect();
-        // 사이드바의 실제 뷰포트 영역(상단/하단)과 비교
-        if (rowRect.bottom < sidebarRect.top) {
-            hasTop = true;
-        } else if (rowRect.top > sidebarRect.bottom) {
-            hasBottom = true;
+
+        if (isMobile) {
+            // 모바일: 브라우저 뷰포트(화면) 기준
+            // 고정된 info-panel 아래로 사라지면 상단 감지, 화면 밖으로 사라지면 하단 감지
+            if (rowRect.bottom < stickyHeight) {
+                hasTop = true;
+            } else if (rowRect.top > window.innerHeight) {
+                hasBottom = true;
+            }
+        } else {
+            // PC: 사이드바 내부 영역 기준
+            if (rowRect.bottom < sidebarRect.top) {
+                hasTop = true;
+            } else if (rowRect.top > sidebarRect.bottom) {
+                hasBottom = true;
+            }
         }
     });
 
@@ -182,7 +199,7 @@ function updateDetailView(item) {
     document.getElementById('stat1Label').textContent = item.s1;
     document.getElementById('stat1Value').textContent = item.v1;
 
-    document.getElementById('stat2Label').textContent = item.s2 !== '-' ? item.s2 : '없음';
+    document.getElementById('stat2Label').textContent = item.s2 !== '-' ? item.s2 : '-';
     document.getElementById('stat2Value').textContent = item.v2;
 
     document.getElementById('traitLabel').textContent = item.t;
@@ -272,7 +289,7 @@ function applyFilter(conditionFn, msg) {
     document.getElementById('resetBtn').style.display = 'block';
 
     // 필터 적용 후 인디케이터 초기 업데이트
-    setTimeout(updateScrollIndicators, 100); 
+    setTimeout(updateScrollIndicators, 100);
 }
 
 function resetFilter() {
