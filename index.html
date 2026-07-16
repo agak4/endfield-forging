@@ -11,7 +11,16 @@
 <body>
 
     <div class="sidebar-outer">
-        <div class="sidebar" id="sidebar"></div>
+        <div class="sidebar" id="sidebar">
+            <div class="sort-control">
+                <button type="button" class="sort-button" id="sortButton" aria-expanded="false" aria-controls="sortDropdown">정렬: 장비 부품 유형</button>
+                <div class="sort-dropdown" id="sortDropdown">
+                    <button type="button" class="sort-option active" data-sort="material">장비 부품 유형</button>
+                    <button type="button" class="sort-option" data-sort="category">부위 유형</button>
+                </div>
+            </div>
+            <div class="sidebar-content" id="sidebarContent"></div>
+        </div>
         <div class="scroll-indicator top" id="indicatorTop"></div>
         <div class="scroll-indicator bottom" id="indicatorBottom"></div>
     </div>
@@ -25,7 +34,8 @@
 
     <div class="info-panel">
         <div class="info-set-name">
-            <span id="detailSet">세트 이름</span> / <span id="detailCategory">분류</span> / <span id="detailMaterial">재료</span>
+            <span class="info-set-name-main"><span id="detailSet">세트 이름</span> / <span id="detailCategory">분류</span></span>
+            <span class="last-updated">최종 업데이트 26-07-16</span>
         </div>
         <h1 class="info-title" id="detailName">장비 이름</h1>
         
@@ -52,7 +62,6 @@
                 <span><div class="dot" style="background:var(--accent)"></div> 선택됨</span>
                 <span><div class="dot" style="background:var(--good)"></div> 수치 높음</span>
             </div>
-            <div class="material-filter" id="materialFilterArea"></div>
             <button class="filter-reset-btn" id="resetBtn" onclick="resetFilter()">필터 초기화</button>
         </div>
     </div>

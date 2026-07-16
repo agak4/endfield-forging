@@ -1,6 +1,13 @@
 // 장비 데이터를 저장할 전역 변수
 let equipmentData = [];
-const DEFAULT_MATERIALS = ['식양', '적동', '혁동'];
+const MATERIAL_SORT_ORDER = ['작동', '혁동', '적동', '식양'];
+const CATEGORY_SORT_ORDER = ['부품', '보호 장갑', '방어구'];
+const SORT_LABELS = {
+    material: '장비 부품 유형',
+    category: '부위 유형'
+};
+const SORT_STORAGE_KEY = 'endfield-forge-tool-sort';
+const itemRowCache = new Map();
 
 /**
  * CSV 데이터를 파싱하는 함수 (정규표현식 사용 안 함)
@@ -44,7 +51,10 @@ async function loadEquipmentData() {
 
         const csvText = await response.text();
 
-        equipmentData = parseCSV(csvText);
+        equipmentData = parseCSV(csvText).map((item, index) => ({
+            ...item,
+            originalIndex: index
+        }));
 
         if (equipmentData.length === 0) {
             throw new Error('파싱된 데이터가 없습니다.');
@@ -60,132 +70,200 @@ async function loadEquipmentData() {
 
 let currentItem = null;
 let activeFilterContext = null;
-let activeMaterial = null;
+let activeSortType = 'material';
 
 function init() {
     const sidebar = document.getElementById('sidebar');
-    let currentSet = "";
-    let gridContainer = null;
-
-    equipmentData.forEach((item, index) => {
-        if (item.set !== currentSet) {
-            currentSet = item.set;
-
-            const setGroup = document.createElement('div');
-            setGroup.className = 'set-group';
-
-            const header = document.createElement('div');
-            header.className = 'set-header';
-            header.textContent = `=== ${currentSet} ===`;
-            setGroup.appendChild(header);
-
-            gridContainer = document.createElement('div');
-            gridContainer.className = 'item-grid';
-            setGroup.appendChild(gridContainer);
-
-            sidebar.appendChild(setGroup);
-        }
-
-        const row = document.createElement('div');
-        row.className = 'item-row';
-        row.id = `item-${index}`;
-        row.title = item.name;
-
-        let touchMoved = false;
-        row.addEventListener('touchstart', () => { touchMoved = false; }, { passive: true });
-        row.addEventListener('touchmove', () => { touchMoved = true; }, { passive: true });
-        row.addEventListener('touchend', (e) => {
-            if (!touchMoved) {
-                e.preventDefault();
-                selectItem(index);
-            }
-        });
-        row.addEventListener('click', () => selectItem(index));
-
-        const img = document.createElement('img');
-        img.className = 'item-thumb';
-        img.src = `images/${item.name}.webp`;
-        img.onerror = function () { this.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiMyMjIiLz48L3N2Zz4='; };
-
-        row.appendChild(img);
-        gridContainer.appendChild(row);
-    });
+    setupSortControls();
+    renderSidebarItems();
 
     sidebar.addEventListener('scroll', updateScrollIndicators);
     window.addEventListener('scroll', updateScrollIndicators); // 모바일 전체 스크롤 대응
 
-    renderMaterialButtons();
     selectItem(0);
 }
 
-function getItemMaterial(item) {
-    return item && item.material ? item.material.trim() : "";
-}
+function setupSortControls() {
+    const sortControl = document.querySelector('.sort-control');
+    const sortButton = document.getElementById('sortButton');
 
-function getMaterialLabel(material) {
-    return material ? `${material} 부품` : "재료 없음";
-}
+    if (!sortControl || !sortButton) return;
 
-function getMaterialButtonLabel(material) {
-    if (!activeFilterContext || !currentItem) {
-        return getMaterialLabel(material);
-    }
+    loadSavedSortType();
+    syncSortControl();
 
-    return `${getMaterialLabel(material)} (${countFilteredItems(material)}개)`;
-}
+    sortButton.addEventListener('click', () => {
+        const isOpen = !sortControl.classList.contains('open');
+        sortControl.classList.toggle('open', isOpen);
+        sortButton.setAttribute('aria-expanded', String(isOpen));
+    });
 
-function getMaterialOptions() {
-    const materials = [...DEFAULT_MATERIALS];
+    document.querySelectorAll('.sort-option').forEach(button => {
+        button.addEventListener('click', () => {
+            activeSortType = button.dataset.sort;
+            saveSortType();
+            syncSortControl();
 
-    equipmentData.forEach(item => {
-        const material = getItemMaterial(item);
-        if (material && !materials.includes(material)) {
-            materials.push(material);
+            sortControl.classList.remove('open');
+            sortButton.setAttribute('aria-expanded', 'false');
+            renderSidebarItems();
+            syncSelectedRow();
+
+            if (activeFilterContext && currentItem) {
+                applyActiveFilter();
+                syncFilterHighlight(currentItem);
+            }
+
+            setTimeout(updateScrollIndicators, 100);
+        });
+    });
+
+    document.addEventListener('click', event => {
+        if (!sortControl.contains(event.target)) {
+            sortControl.classList.remove('open');
+            sortButton.setAttribute('aria-expanded', 'false');
         }
     });
-
-    return materials;
 }
 
-function renderMaterialButtons() {
-    const area = document.getElementById('materialFilterArea');
-    if (!area) return;
-
-    area.innerHTML = '';
-
-    getMaterialOptions().forEach(material => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'material-filter-btn';
-        button.dataset.material = material;
-        button.textContent = getMaterialButtonLabel(material);
-        button.addEventListener('click', () => toggleMaterialFilter(material));
-        area.appendChild(button);
-    });
-
-    syncMaterialButtons();
-}
-
-function syncMaterialButtons() {
-    document.querySelectorAll('.material-filter-btn').forEach(button => {
-        button.classList.toggle('active', button.dataset.material === activeMaterial);
-        button.classList.toggle('exceed', hasFilteredExceedItems(button.dataset.material));
-        button.textContent = getMaterialButtonLabel(button.dataset.material);
-    });
-}
-
-function toggleMaterialFilter(material) {
-    if (!activeFilterContext) return;
-
-    const isClearingMaterial = activeMaterial === material;
-    activeMaterial = isClearingMaterial ? null : material;
-    applyActiveFilter();
-
-    if (isClearingMaterial) {
-        scrollToCurrentItem();
-    } else {
-        scrollToFirstFilteredItem();
+function loadSavedSortType() {
+    const savedSortType = localStorage.getItem(SORT_STORAGE_KEY);
+    if (SORT_LABELS[savedSortType]) {
+        activeSortType = savedSortType;
     }
+}
+
+function saveSortType() {
+    localStorage.setItem(SORT_STORAGE_KEY, activeSortType);
+}
+
+function syncSortControl() {
+    const sortButton = document.getElementById('sortButton');
+    if (sortButton) {
+        sortButton.textContent = `정렬: ${SORT_LABELS[activeSortType]}`;
+    }
+
+    document.querySelectorAll('.sort-option').forEach(option => {
+        option.classList.toggle('active', option.dataset.sort === activeSortType);
+    });
+}
+
+function renderSidebarItems() {
+    const sidebarContent = document.getElementById('sidebarContent');
+    if (!sidebarContent) return;
+
+    const fragment = document.createDocumentFragment();
+
+    getGroupedEquipmentEntries().forEach(group => {
+        const setGroup = document.createElement('div');
+        setGroup.className = 'set-group';
+
+        const header = document.createElement('div');
+        header.className = 'set-header';
+        header.textContent = `=== ${group.set} ===`;
+        setGroup.appendChild(header);
+
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'item-grid';
+        setGroup.appendChild(gridContainer);
+
+        group.entries.forEach(({ item, index }) => {
+            gridContainer.appendChild(createItemRow(item, index));
+        });
+
+        fragment.appendChild(setGroup);
+    });
+
+    sidebarContent.replaceChildren(fragment);
+}
+
+function getGroupedEquipmentEntries() {
+    const groups = [];
+    const groupMap = new Map();
+
+    equipmentData.forEach((item, index) => {
+        if (!groupMap.has(item.set)) {
+            const group = { set: item.set, entries: [] };
+            groupMap.set(item.set, group);
+            groups.push(group);
+        }
+
+        groupMap.get(item.set).entries.push({ item, index });
+    });
+
+    const sortConfig = getSortConfig();
+    if (sortConfig) {
+        groups.forEach(group => {
+            group.entries.sort((a, b) => compareEntriesBySort(a, b, sortConfig));
+        });
+    }
+
+    return groups;
+}
+
+function getSortConfig() {
+    if (activeSortType === 'material') {
+        return { key: 'material', order: MATERIAL_SORT_ORDER };
+    }
+
+    if (activeSortType === 'category') {
+        return { key: 'category', order: CATEGORY_SORT_ORDER };
+    }
+
+    return null;
+}
+
+function compareEntriesBySort(a, b, sortConfig) {
+    const rankDiff = getSortRank(a.item[sortConfig.key], sortConfig.order) - getSortRank(b.item[sortConfig.key], sortConfig.order);
+    if (rankDiff !== 0) return rankDiff;
+
+    return a.item.originalIndex - b.item.originalIndex;
+}
+
+function getSortRank(value, order) {
+    const rank = order.indexOf(value ? value.trim() : '');
+    return rank >= 0 ? rank : order.length;
+}
+
+function createItemRow(item, index) {
+    if (itemRowCache.has(index)) {
+        return itemRowCache.get(index);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.id = `item-${index}`;
+    row.title = item.name;
+
+    let touchMoved = false;
+    row.addEventListener('touchstart', () => { touchMoved = false; }, { passive: true });
+    row.addEventListener('touchmove', () => { touchMoved = true; }, { passive: true });
+    row.addEventListener('touchend', (e) => {
+        if (!touchMoved) {
+            e.preventDefault();
+            selectItem(index);
+        }
+    });
+    row.addEventListener('click', () => selectItem(index));
+
+    const img = document.createElement('img');
+    img.className = 'item-thumb';
+    img.src = `images/${item.name}.webp`;
+    img.onerror = function () { this.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiMyMjIiLz48L3N2Zz4='; };
+
+    row.appendChild(img);
+    itemRowCache.set(index, row);
+    return row;
+}
+
+function syncSelectedRow() {
+    document.querySelectorAll('.item-row.active').forEach(row => row.classList.remove('active'));
+
+    if (!currentItem) return;
+
+    const index = equipmentData.indexOf(currentItem);
+    const row = document.getElementById(`item-${index}`);
+    if (row) row.classList.add('active');
 }
 
 /**
@@ -239,13 +317,10 @@ function updateScrollIndicators() {
 
 // 2. 아이템 선택
 function selectItem(index) {
-    const prev = document.querySelector('.item-row.active');
-    if (prev) prev.classList.remove('active');
-
-    const current = document.getElementById(`item-${index}`);
-    if (current) current.classList.add('active');
-
     currentItem = equipmentData[index];
+    if (!currentItem) return;
+
+    syncSelectedRow();
     updateDetailView(currentItem);
 
     if (activeFilterContext) {
@@ -290,7 +365,6 @@ function updateDetailView(item) {
     document.getElementById('traitValue').textContent = item.tv;
 
     document.getElementById('detailCategory').textContent = item.category || "부품";
-    document.getElementById('detailMaterial').textContent = getMaterialLabel(getItemMaterial(item));
 }
 
 // 3. 필터링 로직
@@ -321,7 +395,6 @@ function filterByStat(statNum) {
         type: 'basic',
         message: `${targetStatName} ${targetStatValRaw} 이상`
     };
-    activeMaterial = null;
     applyActiveFilter();
 
     syncFilterHighlight(currentItem);
@@ -340,7 +413,6 @@ function filterByTrait() {
         type: 'trait',
         message: `${targetName} ${targetValRaw} 이상`
     };
-    activeMaterial = null;
     applyActiveFilter();
 
     syncFilterHighlight(currentItem);
@@ -372,66 +444,14 @@ function getActiveFilterResult(item) {
     };
 }
 
-function getFilteredItemState(item, material) {
+function getFilteredItemState(item) {
     const result = getActiveFilterResult(item);
     const isSameCategory = currentItem && (item.category === currentItem.category);
-    const isSameMaterial = !material || getItemMaterial(item) === material;
 
     return {
-        match: result.match && isSameCategory && isSameMaterial,
+        match: result.match && isSameCategory,
         exceed: result.exceed
     };
-}
-
-function countFilteredItems(material) {
-    if (!activeFilterContext || !currentItem) return 0;
-
-    return equipmentData.reduce((count, item) => (
-        getFilteredItemState(item, material).match ? count + 1 : count
-    ), 0);
-}
-
-function hasFilteredExceedItems(material) {
-    if (!activeFilterContext || !currentItem) return false;
-
-    return equipmentData.some(item => {
-        const state = getFilteredItemState(item, material);
-        return state.match && state.exceed;
-    });
-}
-
-function getFirstFilteredItemIndex(material) {
-    if (!activeFilterContext || !currentItem) return -1;
-
-    const firstMatchIndex = equipmentData.findIndex(item => getFilteredItemState(item, material).match);
-    const firstExceedIndex = equipmentData.findIndex(item => {
-        const state = getFilteredItemState(item, material);
-        return state.match && state.exceed;
-    });
-
-    return firstExceedIndex >= 0 ? firstExceedIndex : firstMatchIndex;
-}
-
-function scrollToFirstFilteredItem() {
-    scrollToItemIndex(getFirstFilteredItemIndex(activeMaterial));
-}
-
-function scrollToCurrentItem() {
-    scrollToItemIndex(equipmentData.indexOf(currentItem));
-}
-
-function scrollToItemIndex(index) {
-    if (index < 0) return;
-
-    const row = document.getElementById(`item-${index}`);
-    if (!row) return;
-
-    row.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'nearest'
-    });
-    setTimeout(updateScrollIndicators, 100);
 }
 
 function applyActiveFilter() {
@@ -439,7 +459,9 @@ function applyActiveFilter() {
 
     equipmentData.forEach((item, index) => {
         const row = document.getElementById(`item-${index}`);
-        const result = getFilteredItemState(item, activeMaterial);
+        if (!row) return;
+
+        const result = getFilteredItemState(item);
 
         row.classList.remove('dimmed', 'exceed');
 
@@ -453,9 +475,8 @@ function applyActiveFilter() {
     });
 
     document.getElementById('filterInfoArea').style.display = 'block';
-    document.getElementById('filterMsg').textContent = `필터: ${activeFilterContext.message} (분류: ${currentItem.category}, 재료: ${activeMaterial ? getMaterialLabel(activeMaterial) : '전체'})`;
+    document.getElementById('filterMsg').textContent = `필터: ${activeFilterContext.message} (분류: ${currentItem.category})`;
     document.getElementById('resetBtn').style.display = 'block';
-    syncMaterialButtons();
 
     // 필터 적용 후 인디케이터 초기 업데이트
     setTimeout(updateScrollIndicators, 100);
@@ -470,8 +491,6 @@ function resetFilter() {
 
     document.querySelectorAll('.stat-row').forEach(row => row.classList.remove('active-filter'));
     activeFilterContext = null;
-    activeMaterial = null;
-    syncMaterialButtons();
 
     // 필터 초기화 시 인디케이터 숨김
     updateScrollIndicators();

@@ -41,6 +41,76 @@
             flex-direction: column;
         }
 
+        .sort-control {
+            position: relative;
+            flex-shrink: 0;
+            padding: 10px;
+            background-color: var(--sidebar-bg);
+            border-bottom: 1px solid var(--border);
+            z-index: 20;
+        }
+
+        .sort-button {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: #2a2a2a;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .sort-button:hover {
+            background-color: #333;
+        }
+
+        .sort-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% - 6px);
+            left: 10px;
+            right: 10px;
+            flex-direction: column;
+            background-color: #252525;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            z-index: 30;
+        }
+
+        .sort-control.open .sort-dropdown {
+            display: flex;
+        }
+
+        .sort-option {
+            padding: 10px 12px;
+            background: transparent;
+            color: var(--text-main);
+            border: none;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        .sort-option:last-child {
+            border-bottom: none;
+        }
+
+        .sort-option:hover,
+        .sort-option.active {
+            background-color: rgba(255, 215, 0, 0.15);
+            color: #fff;
+        }
+
+        .sidebar-content {
+            display: flex;
+            flex-direction: column;
+        }
+
         /* 스크롤 초과 아이템 표시 인디케이터 */
         .scroll-indicator {
             position: absolute;
@@ -191,9 +261,28 @@
         }
 
         .info-set-name {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
             font-size: 0.9rem;
             color: var(--accent);
             margin-bottom: 20px;
+        }
+
+        .info-set-name-main {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .last-updated {
+            color: var(--text-main);
+            font-size: 0.82rem;
+            font-weight: 600;
+            white-space: nowrap;
         }
 
         .stat-box {
@@ -264,43 +353,6 @@
             color: #fff;
         }
 
-        .material-filter {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 8px;
-            margin-top: 14px;
-        }
-
-        .material-filter-btn {
-            padding: 10px 6px;
-            background-color: #333;
-            color: var(--text-sub);
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            line-height: 1.2;
-            text-align: center;
-            touch-action: manipulation;
-        }
-
-        .material-filter-btn:hover {
-            background-color: #3d3d3d;
-            border-color: #666;
-        }
-
-        .material-filter-btn.active {
-            background-color: rgba(255, 215, 0, 0.15);
-            border-color: var(--accent);
-            color: #fff;
-        }
-
-        .material-filter-btn.exceed {
-            border-color: var(--good);
-            box-shadow: 0 0 8px rgba(0, 255, 127, 0.4);
-            color: #fff;
-        }
-
         .dot {
             width: 11px;
             height: 11px;
@@ -356,6 +408,19 @@
                 z-index: 100;
             }
 
+            .info-set-name {
+                justify-content: space-between;
+            }
+
+            .info-set-name-main {
+                order: 1;
+            }
+
+            .last-updated {
+                order: 2;
+                font-size: 0.75rem;
+            }
+
             .stat-box {
                 flex-direction: row;
                 flex-wrap: nowrap;
@@ -378,11 +443,6 @@
 
             .stat-value {
                 font-size: 0.95rem;
-            }
-
-            .material-filter-btn {
-                font-size: 0.75rem;
-                padding: 8px 4px;
             }
 
             .scroll-indicator {
